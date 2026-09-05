@@ -297,6 +297,14 @@
   <button class="tab-btn" data-tab="resumen">📊 Mi Resumen</button>
 </nav>
 
+<div id="pendingPortalBanner" style="display:none; margin:10px 14px 0; border:1px solid rgba(201,161,90,.4); background:rgba(201,161,90,.13); border-radius:12px; overflow:hidden;">
+  <button type="button" id="pendingPortalBannerToggle" style="width:100%; text-align:left; background:transparent; border:0; padding:12px 14px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; font:inherit; color:inherit;">
+    <span id="pendingPortalBannerText" style="font-weight:700; font-size:13px;">📧 0 clientes tuyos han escrito por correo/portal y esperan primer contacto</span>
+    <span id="pendingPortalBannerArrow" style="font-size:12px; opacity:.7;">▼</span>
+  </button>
+  <div id="pendingPortalBannerList" style="display:none; padding:0 14px 12px; border-top:1px solid rgba(201,161,90,.3);"></div>
+</div>
+
 <main class="content">
 
   <!-- ===================== TAB: MIS CLIENTES (CRM) ===================== -->
@@ -938,7 +946,63 @@ function getFilteredLeads(){
   });
 }
 
+/* ===== Aviso de leads pendientes de primer contacto (correo/portales) =====
+   Muestra los clientes asignados a esta captadora que llegaron por
+   Yapo/TocToc/Proppit y aún no reciben su primer contacto real. */
+const PORTAL_CHANNELS = new Set(['Yapo','TocToc','Proppit']);
+function getPendingPortalLeads(){
+  return (state.leads||[]).filter(l=>
+    PORTAL_CHANNELS.has(l.channel) &&
+    (l.stage||'Primer Contacto')==='Primer Contacto' &&
+    l.status!=='Cerrado' &&
+    l.firstContact && l.lastContact && l.firstContact===l.lastContact
+  ).sort((a,b)=>String(b.firstContact||'').localeCompare(String(a.firstContact||'')));
+}
+async function markLeadFirstContactDone(leadId){
+  const lead=(state.leads||[]).find(l=>l.id===leadId);
+  if(!lead) return;
+  lead.stage='Seguimiento'; lead.status='Activo';
+  lead.lastContact=todayISO(); lead.nextContact=addDays(todayISO(),3);
+  const ok=await saveLead(lead);
+  if(ok){ renderMyLeads(); renderMyStats(); renderPendingPortalBanner(); showToast('Marcado como contactado ✅'); }
+}
+function renderPendingPortalBanner(){
+  const banner=document.getElementById('pendingPortalBanner');
+  const text=document.getElementById('pendingPortalBannerText');
+  const list=document.getElementById('pendingPortalBannerList');
+  if(!banner||!text||!list) return;
+  const pending=getPendingPortalLeads();
+  if(!pending.length){ banner.style.display='none'; return; }
+  banner.style.display='block';
+  text.textContent=`📧 ${pending.length} cliente${pending.length===1?'':'s'} tuyos han escrito por correo/portal y esperan primer contacto`;
+  list.innerHTML=pending.map(l=>{
+    const wa=waLink(l.phone);
+    return `<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid rgba(201,161,90,.2); flex-wrap:wrap;">
+      <div style="min-width:0;">
+        <strong>${escapeHtml(l.name||'Sin nombre')}</strong> · <span class="hint">${escapeHtml(l.channel||'')}</span>
+        ${l.property?` · <span class="hint">${escapeHtml(l.property)}</span>`:''}
+      </div>
+      <div style="display:flex; gap:6px; flex-shrink:0;">
+        ${wa?`<a href="${wa}" target="cimaWhatsApp" rel="noopener" class="ghost small" style="text-decoration:none; padding:6px 10px; border-radius:8px;">💬 WhatsApp</a>`:''}
+        <button type="button" class="ghost small" style="padding:6px 10px; border-radius:8px;" data-mark-contacted="${escapeHtml(String(l.id))}">✅ Contactado</button>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-mark-contacted]').forEach(btn=>{
+    btn.addEventListener('click',()=>markLeadFirstContactDone(btn.dataset.markContacted));
+  });
+}
+document.getElementById('pendingPortalBannerToggle')?.addEventListener('click',()=>{
+  const list=document.getElementById('pendingPortalBannerList');
+  const arrow=document.getElementById('pendingPortalBannerArrow');
+  if(!list) return;
+  const show=list.style.display==='none';
+  list.style.display=show?'block':'none';
+  if(arrow) arrow.textContent=show?'▲':'▼';
+});
+
 function renderMyLeads(){
+  renderPendingPortalBanner();
   const container=document.getElementById('myLeadsList');
   const filtered = getFilteredLeads();
   if(!filtered.length){ container.innerHTML='<div class="empty-hint">No tienes clientes que coincidan con estos filtros.</div>'; return; }
