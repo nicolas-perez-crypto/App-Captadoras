@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<title>Cima Propiedades — Panel Captadora</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#14171a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cima Captadora">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="icon" href="/icons/icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg: #14171a;
+    --bg-panel: #1c2024;
+    --bg-panel-2: #22262b;
+    --bg-panel-3: #282d33;
+    --border: #2c3136;
+    --text: #e9ebed;
+    --text-dim: #9aa1a8;
+    --gold: #c9a15a;
+    --gold-bg: rgba(201,161,90,.13);
+    --green: #4caf7d;
+    --green-bg: rgba(76,175,125,.13);
+    --amber: #d9a441;
+    --amber-bg: rgba(217,164,65,.13);
+    --red: #d9614f;
+    --red-bg: rgba(217,97,79,.13);
+    --blue: #5a9bd9;
+    --blue-bg: rgba(90,155,217,.13);
+    --grey-bg: rgba(154,161,168,.10);
+    --radius: 10px;
+    --font-ui: -apple-system, "Segoe UI", Inter, Roboto, Arial, sans-serif;
+    --font-display: Georgia, "Times New Roman", serif;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--text); font-family:var(--font-ui); min-height:100vh; }
+
+  /* ---- Auth gate ---- */
+  #cimaAuthGate{
+    position:fixed; inset:0; background:var(--bg); z-index:500;
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  #cimaAuthGate[hidden]{ display:none !important; }
+  .cima-auth-card{
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:14px;
+    padding:32px; width:100%; max-width:360px; text-align:center;
+  }
+  .cima-auth-card .mark{ font-family:var(--font-display); font-size:26px; color:var(--gold); margin-bottom:2px; }
+  .cima-auth-sub{ color:var(--text-dim); font-size:13px; margin:0 0 22px; }
+  .cima-auth-field{ text-align:left; margin-bottom:14px; }
+  .cima-auth-field label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:5px; }
+  .cima-auth-field input{
+    width:100%; background:var(--bg-panel-2); border:1px solid var(--border); color:var(--text);
+    padding:10px 12px; border-radius:8px; font-size:14px; font-family:var(--font-ui);
+  }
+  .cima-auth-btn{
+    width:100%; background:var(--gold); color:#1a1d21; border:none; padding:11px;
+    border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; margin-top:6px;
+  }
+  .cima-auth-btn:disabled{ opacity:.6; cursor:default; }
+  .cima-auth-error{ color:var(--red); font-size:12.5px; margin-top:12px; min-height:16px; }
+  .cima-auth-note{ color:var(--text-dim); font-size:11px; margin-top:16px; }
+
+  /* ---- Header ---- */
+  header.top-header{
+    padding:16px 24px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    background:var(--bg-panel);
+  }
+  header .brand-mark{ font-family:var(--font-display); font-size:20px; color:var(--gold); }
+  header .brand-sub{ font-size:11.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.5px; }
+  #cimaAuthUserBox{ display:flex; align-items:center; gap:10px; font-size:13px; }
+  #cimaLogoutBtn{
+    background:none; border:1px solid var(--border); color:var(--text); padding:6px 12px;
+    border-radius:7px; font-size:12px; cursor:pointer; font-family:var(--font-ui);
+  }
+  #cimaLogoutBtn:hover{ border-color:var(--gold); color:var(--gold); }
+
+  nav.tabs{ display:flex; gap:4px; padding:0 24px; border-bottom:1px solid var(--border); overflow-x:auto; background:var(--bg-panel); }
+  nav.tabs button{
+    background:none; border:none; color:var(--text-dim); padding:13px 16px; font-size:13.5px; cursor:pointer;
+    border-bottom:2px solid transparent; white-space:nowrap; font-family:var(--font-ui); font-weight:600;
+  }
+  nav.tabs button.active{ color:var(--gold); border-bottom-color:var(--gold); }
+  nav.tabs button:hover:not(.active){ color:var(--text); }
+
+  main.content{ max-width:1100px; margin:0 auto; padding:22px 24px 80px; }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  .card{ background:var(--bg-panel); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:18px; }
+  .card h3{ margin:0 0 14px; font-size:13.5px; font-weight:600; color:var(--gold); text-transform:uppercase; letter-spacing:.6px; }
+  .hint{ font-size:12px; color:var(--text-dim); margin-top:6px; }
+  .empty-hint{ color:var(--text-dim); font-size:13px; padding:14px 0; }
+
+  .row{ display:flex; flex-wrap:wrap; gap:12px; margin-bottom:10px; }
+  .field{ display:flex; flex-direction:column; gap:5px; flex:1 1 180px; }
+  .field label{ font-size:12px; color:var(--text-dim); }
+  input[type=text], input[type=date], input[type=time], input[type=number], select, textarea{
+    background:var(--bg-panel-2); border:1px solid var(--border); color:var(--text);
+    padding:8px 10px; border-radius:7px; font-size:13.5px; font-family:var(--font-ui); outline:none;
+  }
+  input:focus, select:focus, textarea:focus{ border-color:var(--gold); }
+  textarea{ resize:vertical; width:100%; }
+
+  button.primary{
+    background:var(--gold); color:#1a1d21; border:none; padding:9px 16px;
+    border-radius:7px; font-size:13.5px; font-weight:600; cursor:pointer; font-family:var(--font-ui);
+  }
+  button.primary:hover{ filter:brightness(1.08); }
+  button.primary:disabled{ opacity:.5; cursor:default; }
+  button.ghost, a.ghost{
+    background:none; border:1px solid var(--border); color:var(--text);
+    padding:7px 13px; border-radius:7px; font-size:12.5px; cursor:pointer; font-family:var(--font-ui);
+    text-decoration:none; display:inline-flex; align-items:center;
+  }
+  button.ghost:hover, a.ghost:hover{ border-color:var(--gold); color:var(--gold); }
+  button.small{ padding:5px 10px; font-size:12px; }
+  button.danger:hover{ border-color:var(--red); color:var(--red); }
+
+  .toast{
+    position:fixed; bottom:22px; right:22px; background:var(--bg-panel-2);
+    border:1px solid var(--gold); color:var(--text); padding:10px 16px; border-radius:8px;
+    font-size:13.5px; opacity:0; transform:translateY(8px);
+    transition:opacity .2s ease, transform .2s ease; pointer-events:none; z-index:100;
+  }
+  .toast.show{ opacity:1; transform:translateY(0); }
+
+  /* ===== Modal de conversación ===== */
+  .cima-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px;}
+  .cima-modal-overlay.active{display:flex;}
+  .cima-modal{background:var(--bg-panel-2);border:1px solid var(--border);border-radius:12px;max-width:640px;width:100%;max-height:82vh;display:flex;flex-direction:column;}
+  .cima-modal-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .cima-modal-head h3{margin:0;font-size:15px;color:var(--text);}
+  .cima-modal-body{padding:14px 16px;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;line-height:1.55;color:var(--text);background:var(--bg);}
+  /* ===== Burbujas estilo WhatsApp para ver conversación ===== */
+  .wa-chat{display:flex;flex-direction:column;white-space:normal;padding:2px 2px 4px;}
+  .wa-date-sep{align-self:center;background:var(--bg-panel-3);color:var(--text-dim);font-size:10.5px;font-weight:600;padding:3px 12px;border-radius:8px;margin:14px 0 10px;}
+  .wa-date-sep:first-child{margin-top:0;}
+  .wa-bubble{max-width:78%;padding:7px 10px 6px;border-radius:12px;font-size:12.5px;line-height:1.45;margin:2px 0;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(0,0,0,.18);}
+  .wa-bubble.in{align-self:flex-start;background:var(--bg-panel-3);border-top-left-radius:3px;}
+  .wa-bubble.out{align-self:flex-end;background:var(--green-bg);border:1px solid rgba(76,175,125,.3);border-top-right-radius:3px;}
+  .wa-bubble.in.grouped{border-top-left-radius:12px;}
+  .wa-bubble.out.grouped{border-top-right-radius:12px;}
+  .wa-bubble .wa-sender{font-size:10.5px;font-weight:700;color:var(--gold);display:block;margin-bottom:3px;}
+  .wa-bubble .wa-time{font-size:9.5px;color:var(--text-dim);display:block;text-align:right;margin-top:4px;}
+  .wa-bubble a{color:var(--blue,#5a9bd9);text-decoration:underline;word-break:break-all;}
+  .cima-modal-close{background:transparent;border:1px solid var(--border);color:var(--text-dim);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:12px;}
+  .conversation-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;background:var(--blue-bg, rgba(90,155,217,.13));color:var(--blue, #5a9bd9);border-radius:6px;padding:2px 7px;margin-left:6px;}
+
+  /* ---- Filtros CRM ---- */
+  .filters-row{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+  .filters-row input, .filters-row select{ flex:1 1 200px; }
+
+  /* ---- Secciones de urgencia ---- */
+  .urgency-section{ margin-bottom:18px; }
+  .urgency-section-header{
+    font-size:12.5px; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+    padding:6px 12px; border-radius:7px; margin-bottom:10px; display:inline-block;
+  }
+  .urgency-section-header.overdue{ background:var(--red-bg); color:var(--red); }
+  .urgency-section-header.today{ background:var(--amber-bg); color:var(--amber); }
+  .urgency-section-header.tomorrow{ background:var(--blue-bg); color:var(--blue); }
+  .urgency-section-header.upcoming{ background:var(--gold-bg); color:var(--gold); }
+  .urgency-section-header.closed{ background:var(--grey-bg); color:var(--text-dim); }
+
+  /* ---- CRM ---- */
+  .crm-lead-card{ background:var(--bg-panel-2); border:1px solid var(--border); border-left:4px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:10px; transition:box-shadow .15s; }
+  .crm-lead-card:hover{ box-shadow:0 2px 10px rgba(0,0,0,.22); }
+  .crm-lead-card.overdue{ border-left-color:var(--red); }
+  .crm-lead-card.today{ border-left-color:var(--amber); }
+  .crm-lead-card.tomorrow{ border-left-color:var(--blue); }
+  .crm-lead-card.upcoming{ border-left-color:var(--gold); }
+  .crm-lead-top{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
+  .crm-lead-identity{ display:flex; gap:11px; align-items:center; min-width:0; }
+  .crm-lead-avatar{ flex:0 0 auto; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#fff; }
+  .crm-lead-name{ font-size:14.5px; font-weight:750; }
+  .crm-lead-phone{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+  .crm-stage-badge{ display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:999px; font-size:11px; font-weight:700; background:var(--grey-bg); color:var(--text-dim); white-space:nowrap; }
+  .crm-stage-badge.primer{ background:var(--green-bg); color:var(--green); }
+  .crm-stage-badge.seguimiento{ background:var(--amber-bg); color:var(--amber); }
+  .crm-stage-badge.documentos{ background:var(--amber-bg); color:var(--amber); }
+  .crm-stage-badge.agenda{ background:var(--blue-bg); color:var(--blue); }
+  .crm-stage-badge.carta{ background:rgba(155,126,219,.12); color:#9b7edb; }
+  .crm-stage-badge.promesa{ background:var(--amber-bg); color:var(--amber); }
+  .crm-stage-badge.vendido{ background:var(--green-bg); color:var(--green); }
+  .crm-stage-badge.no-va{ background:var(--grey-bg); color:var(--text-dim); }
+  .crm-lead-property-block{ margin-top:11px; background:var(--bg-panel-3); border:1px solid var(--border); border-radius:9px; padding:9px 11px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:12.5px; }
+  .crm-lead-property-block strong{ font-weight:650; flex:1 1 200px; }
+  .crm-lead-meta{ display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; font-size:11.5px; color:var(--text-dim); }
+  .crm-lead-meta span{ background:var(--bg-panel-3); border-radius:7px; padding:3px 8px; }
+  .crm-urgency{ font-size:11.5px; font-weight:800; margin-top:9px; display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:7px; }
+  .crm-urgency.overdue{ color:var(--red); background:var(--red-bg); }
+  .crm-urgency.today{ color:var(--amber); background:var(--amber-bg); }
+  .crm-urgency.tomorrow{ color:var(--blue); background:var(--blue-bg); }
+  .crm-urgency.upcoming{ color:var(--gold); background:rgba(201,161,90,.13); }
+  .crm-notes-block{ margin-top:9px; font-size:12px; color:var(--text-dim); background:var(--bg-panel-3); border-radius:8px; padding:8px 10px; }
+  .crm-actions{ display:flex; gap:6px; flex-wrap:wrap; margin-top:11px; }
+  .crm-actions .ghost.small,.crm-actions .whatsapp-link{ border-radius:8px; }
+  .whatsapp-link{ background:var(--green-bg); color:var(--green); border:1px solid var(--green); padding:7px 13px; border-radius:7px; font-size:12.5px; text-decoration:none; }
+
+  /* ---- Propiedades (referencia) ---- */
+  .prop-ref-card{
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    background:var(--bg-panel-2); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px; margin-bottom:10px;
+  }
+  .prop-ref-card h4{ margin:0 0 4px; font-size:15px; }
+  .prop-card-meta{ font-size:12.5px; color:var(--text-dim); }
+  .badge-linked{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;background:var(--blue-bg, rgba(90,155,217,.13));color:var(--blue, #5a9bd9);border-radius:6px;padding:2px 7px;margin-left:8px;vertical-align:middle;}
+  .prop-price{ font-weight:700; color:var(--gold); font-size:14px; font-family:var(--font-display); }
+
+  /* ---- Estadísticas ---- */
+  .stat-grid{ display:flex; flex-wrap:wrap; gap:12px; }
+  .stat-box{ flex:1 1 150px; background:var(--bg-panel-2); border:1px solid var(--border); border-radius:9px; padding:14px; }
+  .stat-value{ font-size:22px; font-weight:700; color:var(--gold); font-family:var(--font-display); }
+  .stat-label{ font-size:12px; color:var(--text-dim); margin-top:2px; }
+
+  /* ---- Calendario ---- */
+  .cal-header{ display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:16px; }
+  .cal-title{ font-size:16px; font-weight:700; color:var(--gold); min-width:160px; text-align:center; font-family:var(--font-display); }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .cal-weekday{ text-align:center; font-size:11px; color:var(--text-dim); font-weight:700; text-transform:uppercase; padding-bottom:6px; }
+  .cal-day{
+    background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px;
+    min-height:64px; padding:6px; cursor:pointer; transition:border-color .12s ease;
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .cal-day:hover{ border-color:var(--gold); }
+  .cal-day.other-month{ opacity:.35; }
+  .cal-day.today{ border-color:var(--gold); border-width:2px; }
+  .cal-day-number{ font-size:12.5px; font-weight:700; }
+  .cal-event-pill{
+    font-size:10px; background:var(--gold-bg); color:var(--gold); border-radius:4px;
+    padding:2px 5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .cal-event-more{ font-size:10px; color:var(--text-dim); }
+
+  @media (max-width:640px){
+    .cal-day{ min-height:44px; padding:4px; }
+    .cal-event-pill{ display:none; }
+    .cal-day-number{ font-size:11.5px; }
+  }
+
+  /* ---- Modal genérico (día del calendario, etc.) ---- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(10,12,14,.7); z-index:210;
+    display:none; align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal-box{
+    background:var(--bg-panel); border:1px solid var(--border); border-radius:12px;
+    padding:24px; width:100%; max-width:480px; max-height:85vh; overflow-y:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,.5);
+  }
+  .modal-box h3{ margin:0 0 4px; font-size:17px; color:var(--gold); }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+  .event-item{
+    background:var(--bg-panel-2); border:1px solid var(--border); border-radius:8px;
+    padding:10px 12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:flex-start; gap:8px;
+  }
+  .event-item .event-info{ font-size:13px; }
+  .event-item .event-time{ color:var(--gold); font-weight:700; margin-right:6px; }
+  .event-item .event-actions{ display:flex; gap:4px; flex-shrink:0; }
+</style>
+</head>
+<body>
+
+<div id="cimaAuthGate">
+  <div class="cima-auth-card" id="cimaLoginForm">
+    <div class="mark">CIMA PROPIEDADES</div>
+    <p class="cima-auth-sub">Panel Captadora</p>
+    <div class="cima-auth-field"><label for="cimaUsername">Usuario</label><input id="cimaUsername" name="username" autocomplete="username" placeholder="Ej: javiera" required></div>
+    <div class="cima-auth-field"><label for="cimaPassword">Contraseña</label><input id="cimaPassword" name="password" type="password" autocomplete="current-password" required></div>
+    <button class="cima-auth-btn" id="cimaLoginBtn" type="button">Iniciar sesión</button>
+    <div class="cima-auth-error" id="cimaAuthError"></div>
+    <div class="cima-auth-note">Solo usuarios autorizados</div>
+  </div>
+</div>
+
+<header class="top-header">
+  <div>
+    <div class="brand-mark">CIMA PROPIEDADES</div>
+    <div class="brand-sub">Panel Captadora</div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="crm">👥 Mis Clientes</button>
+  <button class="tab-btn" data-tab="calendario">📅 Calendario</button>
+  <button class="tab-btn" data-tab="propiedades">🏠 Mis Propiedades</button>
+  <button class="tab-btn" data-tab="resumen">📊 Mi Resumen</button>
+</nav>
+
+<main class="content">
+
+  <!-- ===================== TAB: MIS CLIENTES (CRM) ===================== -->
+  <section class="panel active" id="panel-crm">
+    <div class="card">
+      <h3>➕ Registrar cliente</h3>
+      <div class="row">
+        <div class="field"><label>Nombre del cliente</label><input type="text" id="leadName" placeholder="Ej: Camila Soto"></div>
+        <div class="field"><label>Canal</label>
+          <select id="leadChannel"><option>WhatsApp</option><option>Facebook</option><option>Yapo</option><option>Proppit</option><option>TocToc</option><option>Otro</option></select>
+        </div>
+        <div class="field"><label>Teléfono / WhatsApp</label><input type="text" id="leadPhone" placeholder="Ej: +56 9 1234 5678"></div>
+        <div class="field"><label>Busca</label><select id="leadOperation"><option>Arriendo</option><option>Venta</option></select></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:2 1 260px;"><label>Propiedad de interés</label>
+          <select id="leadProperty"><option value="">— Ninguna en particular —</option></select>
+        </div>
+        <div class="field"><label>Último contacto</label><input type="date" id="leadDate"></div>
+        <div class="field"><label>Próxima fecha de contacto</label><input type="date" id="leadNextContact"></div>
+        <div class="field"><label>Etapa</label>
+          <select id="leadStage">
+            <option value="Primer Contacto">Primer Contacto</option>
+            <option value="Seguimiento">Seguimiento</option>
+            <option value="Envio documentos">Envio documentos</option>
+            <option value="Se agendo visita">Se agendo visita</option>
+            <option value="Se realizo visita">Se realizo visita</option>
+            <option value="se envio carta compra venta">se envio carta compra venta</option>
+            <option value="se firmo carta compra venta">se firmo carta compra venta</option>
+            <option value="Se firmo Promesa">Se firmo Promesa</option>
+            <option value="Vendido">Vendido</option>
+            <option value="No respondio">No respondio</option>
+            <option value="No compro">No compro</option>
+            <option value="Desistió">Desistió</option>
+            <option value="No califica">No califica</option>
+          </select>
+        </div>
+      </div>
+      <div class="row"><div class="field" style="flex:1 1 100%;"><label>Notas</label><textarea id="leadNotes" rows="2" placeholder="Ej: busca 2 dormitorios, presupuesto hasta $450.000"></textarea></div></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="primary" id="btnAddLead">+ Registrar contacto</button>
+        <button class="ghost small" id="btnCancelLeadEdit" type="button" style="display:none;">Cancelar edición</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Mis clientes</h3>
+      <div class="filters-row">
+        <input type="text" id="leadSearch" placeholder="Buscar por nombre, teléfono...">
+        <select id="filterProperty"><option value="">Todas las propiedades</option></select>
+        <select id="filterUrgency">
+          <option value="">Todos los estados</option>
+          <option value="overdue">🔴 Atrasados</option>
+          <option value="today">🟠 Hoy</option>
+          <option value="tomorrow">🔵 Mañana</option>
+          <option value="upcoming">🟡 Próximos</option>
+          <option value="closed">⚫ Cerrados</option>
+        </select>
+      </div>
+      <div id="myLeadsList"></div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB: CALENDARIO ===================== -->
+  <section class="panel" id="panel-calendario">
+    <div class="card">
+      <div class="cal-header">
+        <button class="ghost small" id="calPrev">◀</button>
+        <div class="cal-title" id="calTitle"></div>
+        <button class="ghost small" id="calNext">▶</button>
+        <button class="ghost small" id="calToday">Hoy</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="hint" style="margin-top:12px;">Haz clic en un día para ver, agregar o editar tus visitas y recordatorios. Este calendario es privado — solo tú lo ves.</div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB: MIS PROPIEDADES (referencia) ===================== -->
+  <section class="panel" id="panel-propiedades">
+    <div class="card">
+      <h3>Propiedades asignadas</h3>
+      <div class="hint" style="margin-bottom:12px;">Información de referencia para tus visitas. Para publicar o repostear, eso lo maneja el administrador.</div>
+      <div id="myPropertiesList"></div>
+    </div>
+  </section>
+
+  <!-- ===================== TAB: RESUMEN ===================== -->
+  <section class="panel" id="panel-resumen">
+    <div class="card">
+      <h3>Resumen general</h3>
+      <div class="stat-grid" id="myStatKpis"></div>
+    </div>
+    <div class="card">
+      <h3>📥 Respaldo de mis clientes (Excel)</h3>
+      <div class="hint" style="margin-bottom:10px;">Descarga una copia de tus clientes y propiedades asignadas.</div>
+      <button class="ghost small" id="btnExportMyXlsx">📗 Descargar respaldo (Excel)</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- MODAL: DETALLE DE DÍA DEL CALENDARIO -->
+<div class="modal-overlay" id="dayModalOverlay">
+  <div class="modal-box" id="dayModalBox"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="cima-modal-overlay" id="conversationModalOverlay">
+  <div class="cima-modal">
+    <div class="cima-modal-head">
+      <h3 id="conversationModalTitle">💬 Conversación</h3>
+      <button type="button" class="cima-modal-close" id="conversationModalClose">✕ Cerrar</button>
+    </div>
+    <div class="cima-modal-body" id="conversationModalBody"></div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG SUPABASE (mismo proyecto que la app principal de Cima)
+===================================================================== */
+const SUPABASE_URL = 'https://rbpsdtsprnbzsloudbsz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_qhImGGKzda-uR12-yE7wZg_xpXfyKK4';
+let supabaseClient = null;
+try {
+  if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { storageKey: 'cima-captadoras-auth' }
+    });
+  }
+} catch (e) { console.warn('Supabase no inicializado:', e); }
+
+/* =====================================================================
+   UTILIDADES
+===================================================================== */
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function daysBetween(a, b){
+  if(!a || !b) return 9999;
+  const d1 = new Date(a + 'T00:00:00');
+  const d2 = new Date(b + 'T00:00:00');
+  return Math.round((d2 - d1) / (1000*60*60*24));
+}
+function addDays(dateStr, days){
+  if(!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+}
+function escapeHtml(str){ return String(str||'').replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+function avatarInitials(name){
+  const parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '?';
+  return (parts[0][0]+(parts[1]?parts[1][0]:'')).toUpperCase();
+}
+function avatarColor(name){
+  const palette=['#c9a15a','#5a9bd9','#4caf7d','#d9614f','#9b7edb','#d9a441','#4fb0c6','#c65f9b'];
+  const str=String(name||'x');
+  let hash=0; for(let i=0;i<str.length;i++){ hash=str.charCodeAt(i)+((hash<<5)-hash); }
+  return palette[Math.abs(hash)%palette.length];
+}
+function escapeAttr(str){ return escapeHtml(str); }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ===== Modal de conversación (solo lectura) ===== */
+/* ===== Parser de conversación exportada de WhatsApp -> burbujas de chat ===== */
+function parseWhatsAppChat(raw){
+  if(!raw) return [];
+  // Normaliza caracteres invisibles típicos de exportaciones de WhatsApp desde celular
+  // (marcas de dirección de texto LRM/RLM, BOM, espacio de ancho cero, espacio irrompible)
+  raw=String(raw).replace(/[\u200E\u200F\uFEFF\u200B]/g,'').replace(/\u00A0/g,' ');
+  const lines=raw.split(/\r?\n/);
+  const lineRe=/^\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*([^:]+):\s?(.*)$/;
+  const messages=[];
+  lines.forEach(line=>{
+    const m=line.match(lineRe);
+    if(m){
+      messages.push({time:m[1],date:m[2],sender:m[3].trim(),text:m[4]});
+    } else if(messages.length){
+      const last=messages[messages.length-1];
+      last.text += (last.text?'\n':'')+line;
+    }
+  });
+  return messages;
+}
+function waChatIsClientSender(sender){
+  return /^\+?[\d\s()-]{6,}$/.test(String(sender||'').trim());
+}
+function waChatLinkify(escapedText){
+  return escapedText.replace(/(https?:\/\/[^\s<]+)/g, url=>`<a href="${url}" target="_blank" rel="noopener">${url}</a>`);
+}
+function renderWhatsAppChatHTML(raw, contactLabel){
+  const messages=parseWhatsAppChat(raw);
+  if(!messages.length) return null;
+  let lastDate=null, lastSender=null, html='<div class="wa-chat">';
+  messages.forEach(msg=>{
+    if(msg.date!==lastDate){ html+=`<div class="wa-date-sep">${escapeHtml(msg.date)}</div>`; lastDate=msg.date; lastSender=null; }
+    const incoming=waChatIsClientSender(msg.sender);
+    const sameAsPrev=msg.sender===lastSender;
+    const label=incoming?(contactLabel||msg.sender):msg.sender;
+    const textHtml=waChatLinkify(escapeHtml(msg.text)).replace(/\n/g,'<br>');
+    html+=`<div class="wa-bubble ${incoming?'in':'out'}${sameAsPrev?' grouped':''}">${!sameAsPrev?`<span class="wa-sender">${escapeHtml(label)}</span>`:''}${textHtml}<span class="wa-time">${escapeHtml(msg.time)}</span></div>`;
+    lastSender=msg.sender;
+  });
+  html+='</div>';
+  return html;
+}
+function openConversationModal(lead){
+  const overlay=document.getElementById('conversationModalOverlay'); if(!overlay) return;
+  const title=document.getElementById('conversationModalTitle');
+  const body=document.getElementById('conversationModalBody');
+  if(title) title.textContent=`💬 Conversación — ${lead.name||'Sin nombre'}`;
+  if(body){
+    const raw=lead.conversation||'';
+    if(!raw.trim()){
+      body.textContent='Sin conversación registrada.';
+    } else {
+      const chatHtml=renderWhatsAppChatHTML(raw, lead.name);
+      if(chatHtml) body.innerHTML=chatHtml; else body.textContent=raw;
+    }
+  }
+  overlay.classList.add('active');
+}
+function closeConversationModal(){
+  const overlay=document.getElementById('conversationModalOverlay'); if(overlay) overlay.classList.remove('active');
+}
+function setupConversationModal(){
+  document.getElementById('conversationModalClose')?.addEventListener('click', closeConversationModal);
+  document.getElementById('conversationModalOverlay')?.addEventListener('click', e=>{ if(e.target.id==='conversationModalOverlay') closeConversationModal(); });
+}
+setupConversationModal();
+function waLink(phone){ const d=String(phone||'').replace(/[^\d]/g,''); return d?`https://web.whatsapp.com/send?phone=${d}`:null; }
+function callLink(phone){ const d=String(phone||'').replace(/[^\d+]/g,''); return d?`tel:${d}`:null; }
+function formatMoney(value, currency){
+  if(value===null||value===undefined||value==='') return '—';
+  return currency==='UF' ? `UF ${Number(value).toLocaleString('es-CL')}` : `$${Number(value).toLocaleString('es-CL')}`;
+}
+function formatLeadDate(dateStr){
+  if(!dateStr) return '—';
+  const d=new Date(dateStr+'T00:00:00');
+  return d.toLocaleDateString('es-CL',{day:'2-digit',month:'short',year:'numeric'}).replace('.','');
+}
+function relativeContactText(dateStr){
+  if(!dateStr) return 'Sin fecha';
+  const diff=daysBetween(todayISO(),dateStr);
+  if(diff<0) return `Hace ${Math.abs(diff)} día(s)`;
+  if(diff===0) return 'HOY';
+  if(diff===1) return 'MAÑANA';
+  return `En ${diff} día(s)`;
+}
+function getLeadUrgencyKey(lead){
+  if(lead.status==='Cerrado' || lead.stage==='Desistió') return 'closed';
+  const nextDate = lead.nextContact || addDays(lead.lastContact||todayISO(),7);
+  const diff = daysBetween(todayISO(), nextDate);
+  if(diff<0) return 'overdue';
+  if(diff===0) return 'today';
+  if(diff===1) return 'tomorrow';
+  return 'upcoming';
+}
+function urgencyMeta(key){
+  const map={
+    overdue:{label:'🔴 Atrasados',short:'ATRASADO',cls:'overdue'},
+    today:{label:'🟠 Hoy',short:'HOY',cls:'today'},
+    tomorrow:{label:'🔵 Mañana',short:'MAÑANA',cls:'tomorrow'},
+    upcoming:{label:'🟡 Próximos',short:'PRÓXIMO',cls:'upcoming'},
+    closed:{label:'⚫ Cerrados',short:'CERRADO',cls:'closed'}
+  };
+  return map[key]||map.upcoming;
+}
+const URGENCY_ORDER = ['overdue','today','tomorrow','upcoming','closed'];
+const STAGE_OPTIONS = ['Primer Contacto','Seguimiento','Envio documentos','Se agendo visita','Se realizo visita','se envio carta compra venta','se firmo carta compra venta','Se firmo Promesa','Vendido','No respondio','No compro','Desistió','No califica'];
+const CLOSED_STAGES = new Set(['Vendido','No respondio','No compro','Desistió','No califica']);
+function stageIsClosed(stage){ return CLOSED_STAGES.has(stage); }
+function leadStageLabel(stage){ return stage || 'Primer Contacto'; }
+function stageBadgeClass(stage){
+  const map={
+    'Primer Contacto':'primer','Seguimiento':'seguimiento','Envio documentos':'documentos',
+    'Se agendo visita':'agenda','Se realizo visita':'agenda',
+    'se envio carta compra venta':'carta','se firmo carta compra venta':'carta','Se firmo Promesa':'promesa',
+    'Vendido':'vendido','No respondio':'no-va','No compro':'no-va','Desistió':'no-va','No califica':'no-va'
+  };
+  return map[stage]||'primer';
+}
+function daysOnMarket(prop){
+  const start = prop.listedDate || todayISO();
+  const end = (prop.dealStatus==='vendida'||prop.dealStatus==='arrendada') ? (prop.dealDate||todayISO()) : todayISO();
+  return Math.max(0, daysBetween(start,end));
+}
+
+/* =====================================================================
+   ESTADO LOCAL (solo lo asignado a esta captadora)
+===================================================================== */
+const state = { properties: [], leads: [], events: [] };
+let lastLocalWriteAt = 0;
+let filterPropertyId = '';
+let filterUrgencyKey = '';
+
+/* =====================================================================
+   AUTENTICACIÓN (mismo esquema que la app principal)
+===================================================================== */
+let currentAuthUser = null;
+let currentProfile = null;
+let appStartedAfterAuth = false;
+
+function normalizeUsername(v){ return String(v||'').trim().toLowerCase(); }
+async function resolveLoginEmail(username){
+  const { data, error } = await supabaseClient.rpc('get_login_email', { p_username: normalizeUsername(username) });
+  if(error) throw error;
+  if(!data) throw new Error('Usuario o contraseña incorrectos.');
+  return data;
+}
+function setAuthError(msg){ const el=document.getElementById('cimaAuthError'); if(el) el.textContent=msg||''; }
+function setAuthBusy(b){ const btn=document.getElementById('cimaLoginBtn'); if(btn){btn.disabled=!!b; btn.textContent=b?'Verificando...':'Iniciar sesión';} }
+
+async function loadCurrentProfile(){
+  if(!currentAuthUser) return null;
+  const {data,error}=await supabaseClient.from('profiles').select('id,display_name,role,username').eq('id',currentAuthUser.id).maybeSingle();
+  if(error) throw error;
+  currentProfile = data||null;
+  return currentProfile;
+}
+function renderAuthUser(){
+  const name=(currentProfile&&currentProfile.display_name)||currentAuthUser?.email||'Usuario';
+  const header=document.querySelector('header.top-header');
+  if(header && !document.getElementById('cimaAuthUserBox')){
+    const box=document.createElement('div'); box.id='cimaAuthUserBox';
+    box.innerHTML='<span id="cimaAuthUser"></span><button type="button" id="cimaLogoutBtn">Cerrar sesión</button>';
+    header.appendChild(box);
+    document.getElementById('cimaLogoutBtn').addEventListener('click', async()=>{ await supabaseClient.auth.signOut(); location.reload(); });
+  }
+  const el=document.getElementById('cimaAuthUser'); if(el) el.textContent='👤 '+name;
+}
+async function startAuthenticatedApp(){
+  if(appStartedAfterAuth) return;
+  appStartedAfterAuth = true;
+  await loadCurrentProfile();
+  if(currentProfile && currentProfile.role === 'admin'){
+    setAuthError('Esta app es solo para captadoras. Usa el panel de administración para tu cuenta.');
+    await supabaseClient.auth.signOut();
+    appStartedAfterAuth = false;
+    return;
+  }
+  renderAuthUser();
+  const gate=document.getElementById('cimaAuthGate'); if(gate) gate.hidden=true;
+  resetLeadForm();
+  initCalendar();
+  await loadAllData();
+  setupRealtime();
+}
+async function bootAuthentication(){
+  const doLogin = async ()=>{
+    setAuthError(''); setAuthBusy(true);
+    try{
+      if(!supabaseClient) throw new Error('Supabase no está inicializado (revisa tu conexión a internet).');
+      const username=document.getElementById('cimaUsername').value;
+      const password=document.getElementById('cimaPassword').value;
+      const email=await resolveLoginEmail(username);
+      const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+      if(error) throw error;
+      currentAuthUser=data.user;
+      await startAuthenticatedApp();
+    }catch(err){
+      console.error('Login:',err);
+      setAuthError('Usuario o contraseña incorrectos, o no tienes autorización para acceder. ('+(err && err.message ? err.message : 'sin detalle')+')');
+    }
+    finally{ setAuthBusy(false); }
+  };
+  const loginBtn=document.getElementById('cimaLoginBtn');
+  if(loginBtn) loginBtn.addEventListener('click', doLogin);
+  const pwdInput=document.getElementById('cimaPassword');
+  if(pwdInput) pwdInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  const userInput=document.getElementById('cimaUsername');
+  if(userInput) userInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+  if(!supabaseClient){ setAuthError('No se pudo conectar con el servicio de autenticación.'); return; }
+  try{
+    const {data:{session}}=await supabaseClient.auth.getSession();
+    if(session){ currentAuthUser=session.user; await startAuthenticatedApp(); }
+    supabaseClient.auth.onAuthStateChange(async(event,session)=>{
+      if(event==='SIGNED_IN' && session){ currentAuthUser=session.user; await startAuthenticatedApp(); }
+      if(event==='SIGNED_OUT'){ appStartedAfterAuth=false; currentAuthUser=null; currentProfile=null; const gate=document.getElementById('cimaAuthGate'); if(gate) gate.hidden=false; }
+    });
+  }catch(err){
+    console.error('Error verificando sesión previa:', err);
+    setAuthError('No se pudo verificar si ya había una sesión abierta. Puedes intentar iniciar sesión igual. ('+(err && err.message ? err.message : '')+')');
+  }
+}
+
+/* =====================================================================
+   CARGA DE DATOS (solo lo asignado a mí — reforzado por RLS en el servidor)
+===================================================================== */
+function rowToProperty(r){
+  return {
+    id:r.id, name:r.name, address:r.address||'', price:r.price,
+    priceCurrency:r.price_currency||'CLP', propertyType:r.property_type||'Departamento',
+    dealStatus:r.deal_status||'activa', dealDate:r.deal_date||null, listedDate:r.listed_date||null,
+    assignedTo:r.assigned_to||null
+  };
+}
+function rowToLead(x){
+  return {
+    id:x.id, name:x.name, phone:x.phone, notes:x.notes, stage:x.stage, status:x.status,
+    channel:x.channel, property:x.property, propertyId:x.property_id||null, operation:x.operation,
+    firstContact:x.first_contact, lastContact:x.last_contact, nextContact:x.next_contact, assignedTo:x.assigned_to||null,
+    conversation:x.conversation||null
+  };
+}
+function rowToEvent(x){
+  return {
+    id:x.id, date:x.event_date, time:x.event_time||'', title:x.title||'',
+    leadId:x.lead_id||null, propertyId:x.property_id||null, notes:x.notes||''
+  };
+}
+
+async function loadAllData(){
+  try{
+    const uidMe = currentAuthUser.id;
+    const leadsRes = await supabaseClient.from('leads').select('*').eq('assigned_to', uidMe);
+    if(leadsRes.error){ console.error(leadsRes.error); showToast('Error al cargar datos: '+(leadsRes.error.message||'')); return; }
+    state.leads = (leadsRes.data||[]).map(rowToLead);
+
+    // Además de las propiedades asignadas explícitamente por el admin, se incluyen
+    // las propiedades vinculadas a los contactos que sí tiene asignados esta captadora
+    // (por id de propiedad, o por nombre si el contacto no tiene el id vinculado).
+    // Se hacen consultas separadas (en vez de un solo .or() con texto armado a mano)
+    // porque los nombres de propiedad pueden contener comas y rompen ese formato.
+    const propertyIds = Array.from(new Set(state.leads.map(l=>l.propertyId).filter(Boolean)));
+    const propertyNames = Array.from(new Set(state.leads.filter(l=>!l.propertyId && l.property).map(l=>l.property)));
+
+    const propertyQueries = [ supabaseClient.from('properties').select('*').eq('assigned_to', uidMe) ];
+    if(propertyIds.length) propertyQueries.push(supabaseClient.from('properties').select('*').in('id', propertyIds));
+    if(propertyNames.length) propertyQueries.push(supabaseClient.from('properties').select('*').in('name', propertyNames));
+
+    const [propsResults, eventsRes] = await Promise.all([
+      Promise.all(propertyQueries),
+      supabaseClient.from('calendar_events').select('*').eq('owner_id', uidMe)
+    ]);
+    const badProp = propsResults.find(r=>r.error);
+    if(badProp){ console.error(badProp.error); showToast('Error al cargar propiedades: '+(badProp.error.message||'')); return; }
+    if(eventsRes.error){ console.error(eventsRes.error); showToast('Error al cargar datos: '+(eventsRes.error.message||'')); return; }
+
+    const mergedById = new Map();
+    propsResults.forEach(r=>(r.data||[]).forEach(row=>mergedById.set(row.id, row)));
+    state.properties = Array.from(mergedById.values()).map(rowToProperty).map(p=>({...p, _linkedByContact: p.assignedTo!==uidMe}));
+    state.events = (eventsRes.data||[]).map(rowToEvent);
+
+    populateLeadPropertySelect();
+    populateFilterPropertySelect();
+    renderMyProperties();
+    renderMyLeads();
+    renderMyStats();
+    renderCalendar();
+  }catch(err){
+    console.error(err);
+    showToast('Error al cargar tus datos.');
+  }
+}
+
+let reloadTimer=null;
+function scheduleReload(){
+  if(Date.now() - lastLocalWriteAt < 3000) return;
+  clearTimeout(reloadTimer);
+  reloadTimer=setTimeout(()=>{ loadAllData(); }, 800);
+}
+function setupRealtime(){
+  if(!supabaseClient || !currentAuthUser) return;
+  supabaseClient.channel('captadora-realtime-'+currentAuthUser.id)
+    .on('postgres_changes', {event:'*', schema:'public', table:'properties'}, scheduleReload)
+    .on('postgres_changes', {event:'*', schema:'public', table:'leads', filter:`assigned_to=eq.${currentAuthUser.id}`}, scheduleReload)
+    .on('postgres_changes', {event:'*', schema:'public', table:'calendar_events', filter:`owner_id=eq.${currentAuthUser.id}`}, scheduleReload)
+    .subscribe();
+}
+
+/* =====================================================================
+   GUARDADO (llamadas puntuales)
+===================================================================== */
+async function saveLead(lead){
+  const payload = {
+    id: lead.id, name: lead.name||'', phone: lead.phone||null, notes: lead.notes||null,
+    stage: lead.stage||null, status: lead.status||null, channel: lead.channel||null,
+    property: lead.property||null, property_id: lead.propertyId||null, operation: lead.operation||null,
+    first_contact: lead.firstContact||null, last_contact: lead.lastContact||null, next_contact: lead.nextContact||null,
+    assigned_to: currentAuthUser.id
+  };
+  const {error} = await supabaseClient.from('leads').upsert(payload, {onConflict:'id'});
+  if(error){ console.error(error); showToast('Error al guardar: '+(error.message||'')); return false; }
+  lastLocalWriteAt = Date.now();
+  return true;
+}
+async function deleteLeadRemote(id){
+  const {error} = await supabaseClient.from('leads').delete().eq('id', id);
+  if(error){ console.error(error); showToast('Error al eliminar: '+(error.message||'')); return false; }
+  lastLocalWriteAt = Date.now();
+  return true;
+}
+async function saveEvent(ev){
+  const payload = {
+    id: ev.id, owner_id: currentAuthUser.id, event_date: ev.date, event_time: ev.time||null,
+    title: ev.title||'Evento', lead_id: ev.leadId||null, property_id: ev.propertyId||null, notes: ev.notes||null
+  };
+  const {error} = await supabaseClient.from('calendar_events').upsert(payload, {onConflict:'id'});
+  if(error){ console.error(error); showToast('Error al guardar el evento: '+(error.message||'')); return false; }
+  lastLocalWriteAt = Date.now();
+  return true;
+}
+async function deleteEventRemote(id){
+  const {error} = await supabaseClient.from('calendar_events').delete().eq('id', id);
+  if(error){ console.error(error); showToast('Error al eliminar el evento: '+(error.message||'')); return false; }
+  lastLocalWriteAt = Date.now();
+  return true;
+}
+
+/* =====================================================================
+   MIS PROPIEDADES (referencia — sin republicación)
+===================================================================== */
+function renderMyProperties(){
+  const container=document.getElementById('myPropertiesList');
+  if(!state.properties.length){
+    container.innerHTML = '<div class="empty-hint">Aún no tienes propiedades asignadas ni contactos con una propiedad vinculada. Habla con el administrador.</div>';
+    return;
+  }
+  container.innerHTML = state.properties.map(prop=>{
+    const myLeadsHere = state.leads.filter(l=> l.propertyId===prop.id || (l.property && l.property===prop.name));
+    const count = myLeadsHere.length;
+    const namesPreview = myLeadsHere.slice(0,3).map(l=>escapeHtml(l.name||'Sin nombre')).join(', ') + (myLeadsHere.length>3?` y ${myLeadsHere.length-3} más`:'');
+    return `
+      <div class="prop-ref-card">
+        <div>
+          <h4>${escapeHtml(prop.name)} ${prop._linkedByContact?'<span class="badge-linked" title="No asignada directamente: aparece porque tienes un contacto interesado en ella">👤 Vinculada por contacto</span>':''}</h4>
+          <div class="prop-card-meta">${escapeHtml(prop.propertyType)} · ${escapeHtml(prop.address||'Sin dirección')} · ${daysOnMarket(prop)} días en el mercado</div>
+          ${count?`<div class="prop-card-meta" style="margin-top:3px;">👥 ${escapeHtml(namesPreview)}</div>`:''}
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="prop-price">${formatMoney(prop.price, prop.priceCurrency)}</div>
+          <button class="ghost small btn-view-property-leads" data-prop="${prop.id}">Ver clientes (${count})</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.btn-view-property-leads').forEach(btn=>btn.addEventListener('click', ()=>{
+    filterPropertyId = btn.dataset.prop;
+    const sel=document.getElementById('filterProperty'); if(sel) sel.value = filterPropertyId;
+    document.querySelector('[data-tab="crm"]').click();
+    renderMyLeads();
+  }));
+}
+
+/* =====================================================================
+   MIS CLIENTES (CRM) — con filtros y agrupación visual por urgencia
+===================================================================== */
+function populateLeadPropertySelect(){
+  const sel=document.getElementById('leadProperty');
+  const current=sel.value;
+  sel.innerHTML = '<option value="">— Ninguna en particular —</option>' +
+    state.properties.map(p=>`<option value="${escapeAttr(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+  if(current) sel.value = current;
+}
+function populateFilterPropertySelect(){
+  const sel=document.getElementById('filterProperty');
+  const current=sel.value;
+  sel.innerHTML = '<option value="">Todas las propiedades</option>' +
+    state.properties.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  if(current) sel.value = current;
+}
+
+let editingLeadId=null;
+function resetLeadForm(){
+  editingLeadId=null;
+  const btn=document.getElementById('btnAddLead'); if(btn) btn.textContent='+ Registrar contacto';
+  const cancel=document.getElementById('btnCancelLeadEdit'); if(cancel) cancel.style.display='none';
+  ['leadName','leadPhone','leadNotes'].forEach(id=>{const e=document.getElementById(id); if(e) e.value='';});
+  const propSel=document.getElementById('leadProperty'); if(propSel) propSel.value='';
+  document.getElementById('leadDate').value=todayISO();
+  document.getElementById('leadNextContact').value=addDays(todayISO(),7);
+  document.getElementById('leadStage').value='Primer Contacto';
+  document.getElementById('leadChannel').value='WhatsApp';
+  document.getElementById('leadOperation').value='Venta';
+}
+
+document.getElementById('btnAddLead').addEventListener('click', async ()=>{
+  const name=document.getElementById('leadName').value.trim();
+  if(!name){ showToast('Escribe el nombre del cliente'); return; }
+  const channel=document.getElementById('leadChannel').value;
+  const phone=document.getElementById('leadPhone').value.trim();
+  const operation=document.getElementById('leadOperation').value;
+  const property=document.getElementById('leadProperty').value;
+  const date=document.getElementById('leadDate').value||todayISO();
+  const nextContact=document.getElementById('leadNextContact').value||addDays(date,7);
+  const stage=document.getElementById('leadStage').value||'Primer Contacto';
+  const notes=document.getElementById('leadNotes').value.trim();
+  const propObj = state.properties.find(p=>p.name===property);
+
+  if(editingLeadId){
+    const lead=state.leads.find(l=>l.id===editingLeadId);
+    if(!lead){ showToast('No se encontró el contacto'); resetLeadForm(); return; }
+    Object.assign(lead, {name,channel,phone,operation,property,propertyId:propObj?.id||null,notes,stage,status:stageIsClosed(stage)?'Cerrado':'Activo',lastContact:date,nextContact});
+    const ok = await saveLead(lead);
+    if(ok){ showToast('Contacto actualizado ✅'); resetLeadForm(); renderMyLeads(); renderMyStats(); }
+  } else {
+    const lead={id:uid(),name,channel,phone,operation,property,propertyId:propObj?.id||null,notes,stage,status:stageIsClosed(stage)?'Cerrado':'Activo',firstContact:date,lastContact:date,nextContact,assignedTo:currentAuthUser.id};
+    const ok = await saveLead(lead);
+    if(ok){ state.leads.unshift(lead); showToast('Contacto registrado ✅'); resetLeadForm(); renderMyLeads(); renderMyStats(); }
+  }
+});
+document.getElementById('btnCancelLeadEdit').addEventListener('click', ()=>{ resetLeadForm(); showToast('Edición cancelada'); });
+
+function openLeadEditor(lead){
+  editingLeadId=lead.id;
+  document.getElementById('leadName').value=lead.name||'';
+  document.getElementById('leadPhone').value=lead.phone||'';
+  document.getElementById('leadChannel').value=lead.channel||'WhatsApp';
+  document.getElementById('leadOperation').value=lead.operation||'Venta';
+  document.getElementById('leadProperty').value=lead.property||'';
+  document.getElementById('leadDate').value=lead.lastContact||todayISO();
+  document.getElementById('leadNextContact').value=lead.nextContact||addDays(todayISO(),7);
+  document.getElementById('leadStage').value=lead.stage||'Primer Contacto';
+  document.getElementById('leadNotes').value=lead.notes||'';
+  document.getElementById('btnAddLead').textContent='Guardar cambios';
+  document.getElementById('btnCancelLeadEdit').style.display='inline-block';
+  document.querySelector('[data-tab="crm"]').click();
+  window.scrollTo({top:0,behavior:'smooth'});
+  showToast('Contacto cargado para editar');
+}
+
+function getFilteredLeads(){
+  const search=(document.getElementById('leadSearch').value||'').trim().toLowerCase();
+  return state.leads.filter(l=>{
+    if(search){
+      const hay=[l.name,l.phone,l.property,l.channel].join(' ').toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    if(filterPropertyId){
+      const prop = state.properties.find(p=>p.id===filterPropertyId);
+      const matches = l.propertyId===filterPropertyId || (prop && l.property===prop.name);
+      if(!matches) return false;
+    }
+    if(filterUrgencyKey && getLeadUrgencyKey(l)!==filterUrgencyKey) return false;
+    return true;
+  });
+}
+
+function renderMyLeads(){
+  const container=document.getElementById('myLeadsList');
+  const filtered = getFilteredLeads();
+  if(!filtered.length){ container.innerHTML='<div class="empty-hint">No tienes clientes que coincidan con estos filtros.</div>'; return; }
+
+  if(filterUrgencyKey){
+    container.innerHTML = filtered.map(renderLeadCard).join('');
+  } else {
+    const groups = {};
+    URGENCY_ORDER.forEach(k=>groups[k]=[]);
+    filtered.forEach(l=>groups[getLeadUrgencyKey(l)].push(l));
+    container.innerHTML = URGENCY_ORDER.filter(k=>groups[k].length).map(k=>{
+      const meta=urgencyMeta(k);
+      return `<div class="urgency-section">
+        <div class="urgency-section-header ${meta.cls}">${meta.label} (${groups[k].length})</div>
+        ${groups[k].map(renderLeadCard).join('')}
+      </div>`;
+    }).join('');
+  }
+  bindLeadActions(container);
+}
+
+function renderLeadCard(lead){
+  const urgency=getLeadUrgencyKey(lead), meta=urgencyMeta(urgency);
+  const prop=state.properties.find(p=>p.id===lead.propertyId) || state.properties.find(p=>p.name===lead.property);
+  const price = prop&&prop.price!=null?formatMoney(prop.price,prop.priceCurrency||'CLP'):'';
+  const wa=waLink(lead.phone), tel=callLink(lead.phone);
+  const stage=leadStageLabel(lead.stage);
+  const next=lead.nextContact||addDays(lead.lastContact||todayISO(),7);
+  const closed=urgency==='closed';
+  return `<div class="crm-lead-card ${meta.cls}" data-lead="${lead.id}">
+    <div class="crm-lead-top">
+      <div class="crm-lead-identity">
+        <div class="crm-lead-avatar" style="background:${avatarColor(lead.name)};">${escapeHtml(avatarInitials(lead.name))}</div>
+        <div>
+          <div class="crm-lead-name">${escapeHtml(lead.name||'Sin nombre')}</div>
+          <div class="crm-lead-phone">📞 ${escapeHtml(lead.phone||'Sin teléfono')}</div>
+        </div>
+      </div>
+      <span class="crm-stage-badge ${stageBadgeClass(stage)}">${escapeHtml(stage)}</span>
+    </div>
+    ${(prop||lead.property)?`<div class="crm-lead-property-block"><strong>🏠 ${escapeHtml(prop?.name||lead.property)}</strong>${price?`<span style="color:var(--gold);font-weight:700;">${escapeHtml(price)}</span>`:''}${lead.conversation?`<span class="conversation-badge">💬 Conversación disponible</span>`:''}</div>`:(lead.conversation?`<div class="crm-lead-meta"><span class="conversation-badge">💬 Conversación disponible</span></div>`:'')}
+    <div class="crm-lead-meta">
+      <span>Último: <strong>${escapeHtml(formatLeadDate(lead.lastContact))}</strong></span>
+      <span>Próximo: <strong>${closed?'CERRADO':escapeHtml(formatLeadDate(next))}</strong></span>
+      <span>Canal: ${escapeHtml(lead.channel||'—')}</span>
+    </div>
+    ${!closed?`<div class="crm-urgency ${meta.cls}">📅 ${escapeHtml(meta.short)} · ${escapeHtml(relativeContactText(next))}</div>`:''}
+    ${lead.notes?`<div class="crm-notes-block">📝 ${escapeHtml(lead.notes)}</div>`:''}
+    <div class="row" style="margin:10px 0 0;">
+      <div class="field" style="flex:0 0 auto;">
+        <select class="stage-select" data-lead="${lead.id}" data-role="stage">
+          ${STAGE_OPTIONS.map(o=>`<option value="${escapeAttr(o)}" ${o===stage?'selected':''}>${escapeHtml(o)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="crm-actions">
+      ${wa?`<a class="whatsapp-link" href="${wa}" target="cimaWhatsApp" rel="noopener">💬 WhatsApp</a>`:''}
+      ${tel?`<a class="ghost small" href="${tel}">📞 Llamar</a>`:''}
+      ${lead.conversation?`<button class="ghost small btn-view-conversation" data-lead="${lead.id}">📜 Ver conversación</button>`:''}
+      <button class="ghost small btn-schedule-lead" data-lead="${lead.id}">📅 Agendar</button>
+      <button class="ghost small btn-edit-lead" data-lead="${lead.id}">Editar</button>
+      ${!closed?`<button class="ghost small btn-contacted-lead" data-lead="${lead.id}">✓ Contactado</button>`:''}
+      ${!closed?`<button class="ghost small btn-close-lead" data-lead="${lead.id}">Cerrar</button>`:`<button class="ghost small btn-reopen-lead" data-lead="${lead.id}">Reabrir</button>`}
+      <button class="ghost small danger btn-remove-lead" data-lead="${lead.id}">Eliminar</button>
+    </div>
+  </div>`;
+}
+
+function bindLeadActions(container){
+  container.querySelectorAll('.btn-view-conversation').forEach(btn=>btn.addEventListener('click',()=>{
+    const lead=state.leads.find(l=>l.id===btn.dataset.lead); if(lead) openConversationModal(lead);
+  }));
+  container.querySelectorAll('[data-role="stage"]').forEach(sel=>sel.addEventListener('change', async ()=>{
+    const lead=state.leads.find(l=>l.id===sel.dataset.lead); if(!lead) return;
+    lead.stage=sel.value; lead.status=stageIsClosed(lead.stage)?'Cerrado':'Activo';
+    const ok=await saveLead(lead);
+    if(ok){ renderMyLeads(); renderMyStats(); showToast('Etapa actualizada ✅'); }
+  }));
+  container.querySelectorAll('.btn-contacted-lead').forEach(btn=>btn.addEventListener('click', async ()=>{
+    const lead=state.leads.find(l=>l.id===btn.dataset.lead); if(!lead) return;
+    lead.lastContact=todayISO(); lead.nextContact=addDays(todayISO(),7);
+    const ok=await saveLead(lead);
+    if(ok){ renderMyLeads(); showToast('Contacto registrado. Próximo seguimiento en 7 días ✅'); }
+  }));
+  container.querySelectorAll('.btn-close-lead').forEach(btn=>btn.addEventListener('click', async ()=>{
+    const lead=state.leads.find(l=>l.id===btn.dataset.lead); if(!lead) return;
+    lead.status='Cerrado'; lead.stage='Desistió';
+    const ok=await saveLead(lead);
+    if(ok) renderMyLeads();
+  }));
+  container.querySelectorAll('.btn-reopen-lead').forEach(btn=>btn.addEventListener('click', async ()=>{
+    const lead=state.leads.find(l=>l.id===btn.dataset.lead); if(!lead) return;
+    lead.status='Activo'; lead.stage='Primer Contacto'; lead.lastContact=todayISO(); lead.nextContact=addDays(todayISO(),7);
+    const ok=await saveLead(lead);
+    if(ok) renderMyLeads();
+  }));
+  container.querySelectorAll('.btn-remove-lead').forEach(btn=>btn.addEventListener('click', async ()=>{
+    if(!confirm('¿Eliminar este contacto?')) return;
+    const ok = await deleteLeadRemote(btn.dataset.lead);
+    if(ok){ state.leads=state.leads.filter(l=>l.id!==btn.dataset.lead); renderMyLeads(); renderMyStats(); showToast('Contacto eliminado'); }
+  }));
+  container.querySelectorAll('.btn-edit-lead').forEach(btn=>btn.addEventListener('click', ()=>{
+    const lead=state.leads.find(l=>l.id===btn.dataset.lead); if(lead) openLeadEditor(lead);
+  }));
+  container.querySelectorAll('.btn-schedule-lead').forEach(btn=>btn.addEventListener('click', ()=>{
+    const lead=state.leads.find(l=>l.id===btn.dataset.lead); if(!lead) return;
+    const date = lead.nextContact || todayISO();
+    document.querySelector('[data-tab="calendario"]').click();
+    openDayModal(date, { prefillTitle: `Visita: ${lead.name}`, prefillLeadId: lead.id });
+  }));
+}
+document.getElementById('leadSearch').addEventListener('input', renderMyLeads);
+document.getElementById('filterProperty').addEventListener('change', (e)=>{ filterPropertyId=e.target.value; renderMyLeads(); });
+document.getElementById('filterUrgency').addEventListener('change', (e)=>{ filterUrgencyKey=e.target.value; renderMyLeads(); });
+
+/* =====================================================================
+   CALENDARIO (mensual, privado, editable)
+===================================================================== */
+let calYear, calMonth; // calMonth: 0-11
+
+function initCalendar(){
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+}
+
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const WEEKDAY_NAMES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+function pad2(n){ return String(n).padStart(2,'0'); }
+function dateKey(y,m,d){ return `${y}-${pad2(m+1)}-${pad2(d)}`; }
+
+function renderCalendar(){
+  const titleEl=document.getElementById('calTitle');
+  if(!titleEl) return;
+  titleEl.textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
+
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML = WEEKDAY_NAMES.map(w=>`<div class="cal-weekday">${w}</div>`).join('');
+
+  const firstOfMonth = new Date(calYear, calMonth, 1);
+  const startOffset = (firstOfMonth.getDay()+6)%7; // 0=lunes
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+  const todayStr = todayISO();
+
+  const eventsByDate = {};
+  state.events.forEach(ev=>{ (eventsByDate[ev.date] = eventsByDate[ev.date]||[]).push(ev); });
+
+  const cells = [];
+  for(let i=0;i<startOffset;i++){
+    const d = daysInPrevMonth - startOffset + i + 1;
+    const pm = calMonth===0 ? 11 : calMonth-1;
+    const py = calMonth===0 ? calYear-1 : calYear;
+    cells.push({d, key:dateKey(py,pm,d), otherMonth:true});
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    cells.push({d, key:dateKey(calYear,calMonth,d), otherMonth:false});
+  }
+  const remaining = (7 - (cells.length % 7)) % 7;
+  for(let i=1;i<=remaining;i++){
+    const nm = calMonth===11 ? 0 : calMonth+1;
+    const ny = calMonth===11 ? calYear+1 : calYear;
+    cells.push({d:i, key:dateKey(ny,nm,i), otherMonth:true});
+  }
+
+  grid.innerHTML += cells.map(c=>{
+    const evs = eventsByDate[c.key]||[];
+    const isToday = c.key===todayStr;
+    const shown = evs.slice(0,2);
+    const more = evs.length - shown.length;
+    return `<div class="cal-day ${c.otherMonth?'other-month':''} ${isToday?'today':''}" data-date="${c.key}">
+      <div class="cal-day-number">${c.d}</div>
+      ${shown.map(ev=>`<div class="cal-event-pill">${ev.time?escapeHtml(ev.time)+' ':''}${escapeHtml(ev.title)}</div>`).join('')}
+      ${more>0?`<div class="cal-event-more">+${more} más</div>`:''}
+    </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.cal-day').forEach(cell=>{
+    cell.addEventListener('click', ()=> openDayModal(cell.dataset.date));
+  });
+}
+
+document.getElementById('calPrev').addEventListener('click', ()=>{
+  calMonth--; if(calMonth<0){ calMonth=11; calYear--; }
+  renderCalendar();
+});
+document.getElementById('calNext').addEventListener('click', ()=>{
+  calMonth++; if(calMonth>11){ calMonth=0; calYear++; }
+  renderCalendar();
+});
+document.getElementById('calToday').addEventListener('click', ()=>{
+  initCalendar();
+  renderCalendar();
+});
+
+let dayModalDate = null;
+let editingEventId = null;
+
+function openDayModal(dateKeyStr, options){
+  dayModalDate = dateKeyStr;
+  editingEventId = null;
+  renderDayModal(options||{});
+  document.getElementById('dayModalOverlay').classList.add('show');
+}
+function closeDayModal(){
+  document.getElementById('dayModalOverlay').classList.remove('show');
+  dayModalDate = null; editingEventId = null;
+  renderCalendar();
+}
+document.getElementById('dayModalOverlay').addEventListener('click', (e)=>{
+  if(e.target.id==='dayModalOverlay') closeDayModal();
+});
+
+function renderDayModal(options){
+  options = options || {};
+  const box=document.getElementById('dayModalBox');
+  const d=new Date(dayModalDate+'T00:00:00');
+  const label = d.toLocaleDateString('es-CL',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const dayEvents = state.events.filter(e=>e.date===dayModalDate);
+
+  const editingEvent = editingEventId ? dayEvents.find(e=>e.id===editingEventId) : null;
+  const formTitle = editingEvent ? (editingEvent.title||'') : (options.prefillTitle||'');
+  const formTime = editingEvent ? (editingEvent.time||'') : '';
+  const formLeadId = editingEvent ? (editingEvent.leadId||'') : (options.prefillLeadId||'');
+  const formNotes = editingEvent ? (editingEvent.notes||'') : '';
+
+  box.innerHTML = `
+    <h3>${escapeHtml(label.charAt(0).toUpperCase()+label.slice(1))}</h3>
+    <div class="hint" style="margin-bottom:14px;">Tus visitas y recordatorios de este día.</div>
+    <div id="dayEventsList">
+      ${dayEvents.length ? dayEvents.map(ev=>`
+        <div class="event-item">
+          <div class="event-info">
+            <span class="event-time">${ev.time?escapeHtml(ev.time):'—'}</span>
+            <strong>${escapeHtml(ev.title)}</strong>
+            ${ev.leadId ? (()=>{ const l=state.leads.find(x=>x.id===ev.leadId); return l?`<div class="hint" style="margin:2px 0 0;">👤 ${escapeHtml(l.name)}</div>`:''; })() : ''}
+            ${ev.notes?`<div class="hint" style="margin:2px 0 0;">📝 ${escapeHtml(ev.notes)}</div>`:''}
+          </div>
+          <div class="event-actions">
+            <button class="ghost small btn-edit-event" data-event="${ev.id}">✏️</button>
+            <button class="ghost small danger btn-delete-event" data-event="${ev.id}">🗑️</button>
+          </div>
+        </div>`).join('') : '<div class="empty-hint">No hay eventos este día todavía.</div>'}
+    </div>
+
+    <h3 style="margin-top:18px;">${editingEvent ? 'Editar evento' : 'Agregar evento'}</h3>
+    <div class="row">
+      <div class="field" style="flex:2 1 200px;"><label>Título</label><input type="text" id="evTitle" value="${escapeAttr(formTitle)}" placeholder="Ej: Visita depto Las Margaritas"></div>
+      <div class="field" style="flex:1 1 100px;"><label>Hora (opcional)</label><input type="time" id="evTime" value="${escapeAttr(formTime)}"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1 1 100%;"><label>Cliente relacionado (opcional)</label>
+        <select id="evLead">
+          <option value="">— Ninguno —</option>
+          ${state.leads.map(l=>`<option value="${l.id}" ${String(formLeadId)===l.id?'selected':''}>${escapeHtml(l.name)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="row"><div class="field" style="flex:1 1 100%;"><label>Notas</label><textarea id="evNotes" rows="2">${escapeHtml(formNotes)}</textarea></div></div>
+
+    <div class="modal-actions">
+      <button class="ghost small" id="btnDayModalClose">Cerrar</button>
+      ${editingEvent ? `<button class="ghost small" id="btnEventCancelEdit">Cancelar edición</button>` : ''}
+      <button class="primary" id="btnSaveEvent">${editingEvent ? 'Guardar cambios' : '+ Agregar'}</button>
+    </div>
+  `;
+
+  document.getElementById('btnDayModalClose').addEventListener('click', closeDayModal);
+  const cancelEditBtn=document.getElementById('btnEventCancelEdit');
+  if(cancelEditBtn) cancelEditBtn.addEventListener('click', ()=>{ editingEventId=null; renderDayModal({}); });
+
+  box.querySelectorAll('.btn-edit-event').forEach(btn=>btn.addEventListener('click', ()=>{
+    editingEventId = btn.dataset.event;
+    renderDayModal({});
+  }));
+  box.querySelectorAll('.btn-delete-event').forEach(btn=>btn.addEventListener('click', async ()=>{
+    if(!confirm('¿Eliminar este evento?')) return;
+    const ok = await deleteEventRemote(btn.dataset.event);
+    if(ok){
+      state.events = state.events.filter(e=>e.id!==btn.dataset.event);
+      showToast('Evento eliminado');
+      if(editingEventId===btn.dataset.event) editingEventId=null;
+      renderDayModal({});
+    }
+  }));
+
+  document.getElementById('btnSaveEvent').addEventListener('click', async ()=>{
+    const title=document.getElementById('evTitle').value.trim();
+    if(!title){ showToast('Escribe un título para el evento'); return; }
+    const time=document.getElementById('evTime').value||'';
+    const leadId=document.getElementById('evLead').value||null;
+    const notes=document.getElementById('evNotes').value.trim();
+
+    if(editingEvent){
+      Object.assign(editingEvent, {title, time, leadId, notes});
+      const ok=await saveEvent(editingEvent);
+      if(ok){ showToast('Evento actualizado ✅'); editingEventId=null; renderDayModal({}); renderMyStats(); }
+    } else {
+      const ev={ id:uid(), date:dayModalDate, time, title, leadId, propertyId:null, notes };
+      const ok=await saveEvent(ev);
+      if(ok){ state.events.push(ev); showToast('Evento agregado ✅'); renderDayModal({}); renderMyStats(); }
+    }
+  });
+}
+
+/* =====================================================================
+   MI RESUMEN
+===================================================================== */
+function renderMyStats(){
+  const el=document.getElementById('myStatKpis'); if(!el) return;
+  const totalProps=state.properties.length;
+  const totalLeads=state.leads.length;
+  const won=state.leads.filter(l=>l.stage==='Vendido').length;
+  const overdue=state.leads.filter(l=>getLeadUrgencyKey(l)==='overdue').length;
+  const todayEvents=state.events.filter(e=>e.date===todayISO()).length;
+  const weekAhead=addDays(todayISO(),7);
+  const upcomingEvents=state.events.filter(e=>e.date>=todayISO() && e.date<=weekAhead).length;
+  const boxes=[
+    {value:totalProps, label:'Propiedades asignadas'},
+    {value:totalLeads, label:'Clientes'},
+    {value:won, label:'Ventas cerradas'},
+    {value:overdue, label:'Seguimientos atrasados'},
+    {value:todayEvents, label:'Eventos hoy'},
+    {value:upcomingEvents, label:'Eventos próximos 7 días'}
+  ];
+  el.innerHTML=boxes.map(b=>`<div class="stat-box"><div class="stat-value">${b.value}</div><div class="stat-label">${b.label}</div></div>`).join('');
+}
+
+document.getElementById('btnExportMyXlsx').addEventListener('click', ()=>{
+  if(typeof XLSX==='undefined'){ showToast('No se pudo cargar la librería de Excel.'); return; }
+  const wb=XLSX.utils.book_new();
+  const leadsRows=state.leads.map(l=>({
+    'Nombre':l.name||'', 'Teléfono':l.phone||'', 'Canal':l.channel||'', 'Operación':l.operation||'',
+    'Propiedad':l.property||'', 'Etapa':leadStageLabel(l.stage), 'Estado':l.status||'',
+    'Último contacto':l.lastContact||'', 'Próximo contacto':l.nextContact||'', 'Notas':l.notes||''
+  }));
+  const wsLeads=XLSX.utils.json_to_sheet(leadsRows);
+  wsLeads['!cols']=[{wch:22},{wch:15},{wch:12},{wch:10},{wch:26},{wch:16},{wch:10},{wch:14},{wch:14},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, wsLeads, 'Mis Clientes');
+
+  const propsRows=state.properties.map(p=>({
+    'Nombre':p.name||'', 'Tipo':p.propertyType||'', 'Dirección':p.address||'',
+    'Precio':p.price!=null?p.price:'', 'Moneda':p.priceCurrency||'', 'Estado':p.dealStatus||'',
+    'Días en el mercado':daysOnMarket(p)
+  }));
+  const wsProps=XLSX.utils.json_to_sheet(propsRows);
+  wsProps['!cols']=[{wch:28},{wch:16},{wch:30},{wch:12},{wch:9},{wch:10},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, wsProps, 'Mis Propiedades');
+
+  const eventsRows=state.events.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(e=>({
+    'Fecha':e.date, 'Hora':e.time||'', 'Título':e.title||'',
+    'Cliente':(state.leads.find(l=>l.id===e.leadId)||{}).name||'', 'Notas':e.notes||''
+  }));
+  const wsEvents=XLSX.utils.json_to_sheet(eventsRows);
+  wsEvents['!cols']=[{wch:12},{wch:8},{wch:30},{wch:22},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, wsEvents, 'Mi Calendario');
+
+  XLSX.writeFile(wb, `Mis_Clientes_Cima_${todayISO()}.xlsx`);
+  showToast('Respaldo exportado ✅');
+});
+
+/* =====================================================================
+   NAVEGACIÓN DE PESTAÑAS
+===================================================================== */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Inicialización: la aplicación se abre solo después de una sesión válida
+bootAuthentication();
+</script>
+<script>
+  // Registra el service worker para que la app sea instalable y funcione
+  // sin internet. La estrategia usada (ver sw.js) siempre trae la versión
+  // más nueva cuando hay conexión, así que no hace falta botón de "actualizar".
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('No se pudo registrar el service worker:', err);
+      });
+    });
+  }
+</script>
+</body>
+</html>
